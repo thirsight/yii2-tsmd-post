@@ -1,0 +1,4 @@
+
+_dbtpl.php
+_dbtpl-*.php
+!_dbtpl-example.php

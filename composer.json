@@ -1,0 +1,18 @@
+{
+    "name": "thirsight/yii2-tsmd-post",
+    "description": "TSMD Post module for Yii2.",
+    "keywords": ["yii2", "thirsight", "tsmd", "post"],
+    "homepage": "https://tsmd.thirsight.com/",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Haisen",
+            "email": "thirsight@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4.1",
+        "thirsight/yii2-tsmd-base": "~1.0.0"
+    }
+}
