@@ -27,7 +27,7 @@ use tsmd\base\user\models\User;
  * @property int $fileSize
  * @property int $imageWidth
  * @property int $imageHeight
- * @property int $commentStatus
+ * @property int $commentOpen
  * @property int $commentCount
  * @property string $objTable
  * @property string $objid
@@ -60,8 +60,11 @@ class Post extends \tsmd\base\models\ArModel
     const STATUS_PENDING    = 'pending';
     const STATUS_PRIVATE    = 'private';
     const STATUS_TRASH      = 'trash';
-    const STATUS_AUTODRAFT  = 'autoDraft';
+    const STATUS_AUTODRAFT  = 'autodraft';
     const STATUS_INHERIT    = 'inherit';
+
+    const C_OPEN_USER  = 1;
+    const C_OPEN_GUEST = 2;
 
     /**
      * @inheritdoc
@@ -69,7 +72,6 @@ class Post extends \tsmd\base\models\ArModel
     public function init()
     {
         parent::init();
-
         $this->on(static::EVENT_BEFORE_VALIDATE, [$this, 'prefilter']);
         $this->on(static::EVENT_BEFORE_INSERT, [$this, 'saveInput']);
         $this->on(static::EVENT_BEFORE_UPDATE, [$this, 'saveInput']);
@@ -108,7 +110,7 @@ class Post extends \tsmd\base\models\ArModel
             'fileSize' => 'File Size',
             'imageWidth' => 'Image Width',
             'imageHeight' => 'Image Height',
-            'commentStatus' => 'Comment Status',
+            'commentOpen' => 'Comment Open',
             'commentCount' => 'Comment Count',
             'objTable' => 'Object Table',
             'objid' => 'Object ID',
@@ -241,7 +243,7 @@ class Post extends \tsmd\base\models\ArModel
                 }
             }, 'skipOnEmpty' => false],
 
-            ['password', 'string', 'max' => 64],
+            ['password', 'string', 'min' => 6, 'max' => 64],
 
             ['objTable', 'string', 'max' => 64],
             ['objid', 'string', 'max' => 64],
@@ -257,9 +259,8 @@ class Post extends \tsmd\base\models\ArModel
             ['imageWidth', 'integer'],
             ['imageHeight', 'integer'],
 
-            // Reply
-            ['commentStatus', 'default', 'value' => 10],
-            ['commentStatus', 'in', 'range' => [10, 30]],
+            ['commentOpen', 'default', 'value' => self::C_OPEN_USER + self::C_OPEN_GUEST],
+            ['commentOpen', 'in', 'range' => [0, 1, 2, 3]],
 
             ['publishedTime', 'integer'],
         ];
@@ -328,5 +329,14 @@ class Post extends \tsmd\base\models\ArModel
         if ($this->status == self::STATUS_PUBLISH && !$this->publishedTime) {
             $this->publishedTime = time();
         }
+    }
+
+    /**
+     * @param string $input
+     * @return bool
+     */
+    public function validatePassword(string $input)
+    {
+        return empty($this->password) || $this->password == $input;
     }
 }

@@ -9,13 +9,34 @@
  */
 class BePostCest
 {
+    /**
+     * @var int
+     */
     public $poid;
 
+    /**
+     * @return string[]
+     */
     public function _fixtures()
     {
         return [
             'users' => 'tsmd\base\tests\fixtures\UsersFixture',
         ];
+    }
+
+    /**
+     * @group postBePost
+     * @group postBePostSearch
+     */
+    public function trySearch(ApiTester $I)
+    {
+        $data = [
+            'type' => '',
+            'status' => '',
+        ];
+        $url = $I->grabFixture('users')->wrapUrl('/post/v1backend/post/search', 'be');
+        $I->sendGET($url, $data);
+        $I->seeResponseContains('SUCCESS');
     }
 
     /**
@@ -29,12 +50,13 @@ class BePostCest
             'title' => '你有什么问题？',
             'content' => '不想给你答案，自个儿想去。',
             'status' => 'publish',
+            'password' => 'password',
         ];
         $url = $I->grabFixture('users')->wrapUrl('/post/v1backend/post/create', 'be');
         $I->sendPOST($url, $data);
         $I->seeResponseContains('title');
 
-        $this->poid = json_decode($I->grabResponse(), true)['poid'];
+        $this->poid = json_decode($I->grabResponse(), true)['model']['poid'];
     }
 
     /**
@@ -75,26 +97,5 @@ class BePostCest
         $url = $I->grabFixture('users')->wrapUrl('/post/v1backend/post/delete', 'be');
         $I->sendPOST($url, $data);
         $I->seeResponseContains('SUCCESS');
-    }
-
-    /**
-     * @group postBePublishWelfare
-     */
-    public function tryPublishWelfare(ApiTester $I)
-    {
-        $data = [
-            'poid' => '12152',
-            'urlBase' => 'https://files.ada.com.tw/',
-            'urlPath' => 'https://files.ada.com.tw/data/attachment/forum/202205/12/160002511441a2246261ba33cb44d05380f670.jpg',
-            'content' => '不想给你答案，自个儿想去。',
-            'extras' => [
-                'fbid' => 1111111111111111111,
-                'fbAvatar' => '头像',
-                'fbNickname' => '昵称',
-            ],
-        ];
-        $url = $I->grabFixture('users')->wrapUrl('/post/v1backend/post/publish-welfare', 'be');
-        $I->sendPOST($url, $data);
-        $I->seeResponseContains('title');
     }
 }

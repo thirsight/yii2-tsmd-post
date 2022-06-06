@@ -8,32 +8,32 @@ use tsmd\post\models\Post;
 use tsmd\post\models\PostSearch;
 
 /**
- * 提供图文模块的管理接口，添加、查看、修改、删除等
+ * 提供贴文模块的管理接口，添加、查看、修改、删除等
  *
  * Table Field | Description
  * ----------- | -----------
- * poid         | POID
- * parent       | Parent 父级 POID
- * uid          | 用户ID
- * type         | 类型，eg. `post` `page` `link` `file` `notice` `comment` `revision`
- * slug         | 唯一标识，eg. abc
- * title        | 标题
- * excerpt      | 摘要
- * content      | 内容
- * status       | 状态
- * password     | Password
- * redirect     | 跳转
- * urlBase      | Url Base
- * urlPath      | Url Path
- * mimeType     | Mime Type
- * fileSize     | File Size
- * imageWidth   | Image Width
- * imageHeight  | Image Height
- * cmntClosed   | Comment Closed
- * cmntCounter  | Comment Counter
- * objTable     | 关联对象表
- * objid        | 关联对象ID
- * publishedAt  | 发布时间
+ * poid             | POID
+ * parentid         | Parent 父级 POID
+ * uid              | 用户 UID
+ * type             | 类型，eg: `post` `page` `link` `file` `notice` `emer` `qa` `revision`
+ * status           | 状态
+ * slug             | 唯一标识
+ * title            | 标题
+ * excerpt          | 摘要
+ * content          | 内容
+ * password         | Password
+ * redirect         | 跳转
+ * fileBase         | File Url Base
+ * filePath         | File Url Path
+ * mimeType         | Mime Type
+ * fileSize         | File Size
+ * imageWidth       | Image Width
+ * imageHeight      | Image Height
+ * commentStatus    | Comment Status
+ * commentCount     | Comment Count
+ * objTable         | 关联对象表
+ * objid            | 关联对象 ID
+ * publishedTime    | 发布时间
  *
  * Type Values | Description
  * ----------- | -----------
@@ -42,7 +42,8 @@ use tsmd\post\models\PostSearch;
  * link     | 连接
  * file     | 文件、图片
  * notice   | 通知
- * comment  | 评论
+ * emer     | 紧急
+ * qa       | 问答
  * revision | 版本
  *
  * Status Values | Description
@@ -59,26 +60,30 @@ use tsmd\post\models\PostSearch;
 class PostController extends \tsmd\base\controllers\RestController
 {
     /**
-     * 图文列表，可提交类型、状态进行筛选
+     * 贴文列表
      *
-     * <kbd>API</kbd> <kbd>GET</kbd> <kbd>AUTH</kbd> `/post/v1backend/post/index`
+     * <kbd>API</kbd> <kbd>GET</kbd> <kbd>AUTH</kbd> `/post/v1backend/post/search`
      *
      * Argument | Type | Required | Description
      * -------- | ---- | -------- | -----------
      * type     | [[string]] | No | 类型
      * status   | [[string]] | No | 状态
      *
-     * @return array|PostSearch
+     * @return array
      */
-    public function actionIndex()
+    public function actionSearch()
     {
-        $search = new PostSearch(['exclFields' => ['content']]);
-        $rows = $search->search($this->getQueryParams(), true);
-        return TsmdResult::formatSuc('list', $rows, ['count' => $search->counter]);
+        $search = new PostSearch();
+        $search->load($this->getBodyParams(), '');
+        if (!$search->validate()) {
+            return TsmdResult::failed($search->firstErrors);
+        }
+        list($rows, $count) = $search->query()->addSelectFields([], ['content'])->allWithCount();
+        return TsmdResult::response($rows, ['count' => $count]);
     }
 
     /**
-     * 添加图文
+     * 添加贴文
      *
      * <kbd>API</kbd> <kbd>POST</kbd> <kbd>AUTH</kbd> <kbd>/post/v1backend/post/create</kbd>
      *
@@ -87,75 +92,38 @@ class PostController extends \tsmd\base\controllers\RestController
      * type     | [[string]]  | Yes | 类型
      * title    | [[string]]  | Yes | 标题
      * content  | [[string]]  | Yes | 内容
-     * pushTarget | [[string]]  | No  | `all` 所有用户，`parcelGt5kg` 5KG 以上快递包裹的用户
-     *
-     * @return Post
-     */
-    public function actionCreate()
-    {
-        $model = Post::createBy(Yii::$app->request->post(), [
-            'scenario' => Yii::$app->request->post('type'),
-        ]);
-        // 给用户推送通知
-        $pushTarget = Yii::$app->request->post('pushTarget');
-        if (!$model->hasErrors() && $pushTarget) {
-            $model->attachBehavior('PostPush', 'tsmd\post\models\PostPushBehavior');
-            $model->jypushSend($pushTarget);
-        }
-        return $model;
-    }
-
-    /**
-     * 轮询推送通知给指定用户
-     *
-     * <kbd>API</kbd> <kbd>POST</kbd> <kbd>AUTH</kbd> <kbd>/post/v1backend/post/jypush-send</kbd>
-     *
-     * Argument | Type | Required | Description
-     * -------- | ---- | -------- | -----------
-     * poid     | [[integer]] | No | POID
-     * uids     | [[string]]  | No | 多个用户 UID 用半角逗号隔开，如：123,456
      *
      * @return array
      */
-    public function actionJypushSend()
+    public function actionCreate()
     {
-        $poid = $this->getBodyParams('poid');
-        $uids = $this->getBodyParams('uids');
-        if (empty($poid) || empty($uids)) {
-            return TsmdResult::formatErr('Error data.');
-        }
-        $model = $this->findModel($poid);
-        list($res, $return) = Yii::$app->get('jypush')->send($uids, $model->title, 'post', $model->poid);
-        return $res
-            ? TsmdResult::formatSuc('model', $return)
-            : TsmdResult::formatSuc('message', $return);
+        $model = Post::createBy($this->getBodyParams(), [
+            'scenario' => $this->getBodyParams('type'),
+        ]);
+        return $model->hasErrors()
+            ? TsmdResult::failed($model->firstErrors)
+            : TsmdResult::response($model->toArray());
     }
 
     /**
-     * 查看图文
+     * 查看贴文
      *
      * <kbd>API</kbd> <kbd>GET</kbd> <kbd>AUTH</kbd> <kbd>/post/v1backend/post/view</kbd>
      *
      * Argument | Type | Required | Description
      * -------- | ---- | -------- | -----------
-     * poid     | [[integer]] | No | POID
+     * poid     | [[integer]] | Yes | poid
      *
-     * @param $poid
-     * @return Post
+     * @return array
      */
-    public function actionView($poid)
+    public function actionView(int $poid)
     {
-        $row = $this->findModel($poid)->findFormat()->toArray();
-        if ($row['type'] == Post::TYPE_WELFARE) {
-            $binder = new PostBinder();
-            $binder->prepareUserInfos([$row['uid']]);
-            $binder->bindUser($row);
-        }
-        return $row;
+        $model = $this->findModel($poid);
+        return TsmdResult::responseModel($model->toArray());
     }
 
     /**
-     * 修改图文
+     * 修改贴文
      *
      * <kbd>API</kbd> <kbd>POST</kbd> <kbd>AUTH</kbd> <kbd>/post/v1backend/post/update</kbd>
      *
@@ -165,19 +133,21 @@ class PostController extends \tsmd\base\controllers\RestController
      * title    | [[string]]  | Yes | 标题
      * content  | [[string]]  | Yes | 内容
      *
-     * @return Post
+     * @return array
      */
     public function actionUpdate()
     {
-        $post = $this->findModel(Yii::$app->request->post('poid'));
-        $post->scenario = $post->type;
-        $post->load(Yii::$app->request->post(), '');
-        $post->update();
-        return $post;
+        $model = $this->findModel($this->getBodyParams('poid'));
+        $model->setScenario($model->type);
+        $model->load($this->getBodyParams(), '');
+        $model->update();
+        return $model->hasErrors()
+            ? TsmdResult::failed($model->firstErrors)
+            : TsmdResult::response($model->toArray());
     }
 
     /**
-     * 删除图文
+     * 删除贴文
      *
      * <kbd>API</kbd> <kbd>POST</kbd> <kbd>AUTH</kbd> <kbd>/post/v1backend/post/delete</kbd>
      *
@@ -185,65 +155,25 @@ class PostController extends \tsmd\base\controllers\RestController
      * -------- | ---- | -------- | -----------
      * poid     | [[integer]] | No | POID
      *
-     * @return array|Post
+     * @return array
      */
     public function actionDelete()
     {
-        $model =$this->findModel(Yii::$app->request->post('poid'));
-        return $model->delete() ? $this->success() : $model;
+        $model =$this->findModel($this->getBodyParams('poid'));
+        return $model->delete() ? TsmdResult::response() : TsmdResult::failed();
     }
 
     /**
-     * 发布公益贴文
-     *
-     * <kbd>API</kbd> <kbd>POST</kbd> <kbd>AUTH</kbd> <kbd>/post/v1backend/post/publish-welfare</kbd>
-     *
-     * Argument | Type | Required | Description
-     * -------- | ---- | -------- | -----------
-     * poid     | [[integer]] | Yes | POID
-     * urlPath  | [[file]]    | Yes | urlPathFile,
-     * content  | [[string]]  | Yes | 内容
-     * extras   | [[array]]   | Yes | 额外数据
-     *
-     * ```json
-     * {
-     *     'poid': '283747',
-     *     'urlPath': 'urlPathFile',
-     *     'content': '...',
-     *     'extras': {
-     *         'fbid': '...'
-     *         'fbAvatar': 'fbAvatarFile', //固定值
-     *         'fbNickname': '...',
-     *     }
-     *     'urlPathFile':fs.createReadStream("..."),
-     *     'fbAvatarFile':fs.createReadStream("..."),
-     * }
-     * ```
-     *
-     * @return array
-     */
-    public function actionPublishWelfare()
-    {
-        $model = $this->findModel(Yii::$app->request->post('poid', 0), PostWelfare::class);
-        $model->publish(Yii::$app->request->post());
-        return $model->hasErrors()
-            ? TsmdResult::formatErr($model->firstErrors)
-            : TsmdResult::formatSuc('model', $model->toArray());
-    }
-
-    /**
-     * Finds the Log model based on its primary key value.
-     * If the model is not found, a 404 HTTP exception will be thrown.
      * @param string $poid
      * @return Post the loaded model
      * @throws \yii\web\NotFoundHttpException if the model cannot be found
      */
-    protected function findModel($poid, string $class = Post::class)
+    protected function findModel(int $poid)
     {
-        if (($model = $class::findOne(['poid' => $poid])) !== null) {
+        if (($model = Post::findOne($poid)) !== null) {
             return $model;
         } else {
-            throw new \yii\web\NotFoundHttpException('The requested page does not exist.');
+            throw new \yii\web\NotFoundHttpException('The requested `post` does not exist.');
         }
     }
 }

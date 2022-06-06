@@ -9,6 +9,14 @@
  */
 class FePostCest
 {
+    /**
+     * @var int
+     */
+    public $poid;
+
+    /**
+     * @return string[]
+     */
     public function _fixtures()
     {
         return [
@@ -17,41 +25,33 @@ class FePostCest
     }
 
     /**
-     * @group postFePostIndex
+     * @group postFePost
+     * @group postFePostSearch
      */
-    public function tryIndex(ApiTester $I)
+    public function trySearch(ApiTester $I)
     {
         $data = [
             'type' => 'qa',
         ];
-        $url = $I->grabFixture('users')->wrapUrl('/post/v1frontend/post/index', 'fe');
+        $url = $I->grabFixture('users')->wrapUrl('/post/v1frontend/post/search', 'fe');
         $I->sendGET($url, $data);
-        $I->seeResponseContains('title');
+        $I->seeResponseContains('SUCCESS');
+
+        $this->poid = json_decode($I->grabResponse(), true)['list'][0]['poid'];
     }
 
     /**
+     * @group postFePost
      * @group postFePostView
      */
     public function tryView(ApiTester $I)
     {
         $data = [
-            'poidSlug' => '12152',
+            'poidSlug' => $this->poid,
+            'password' => 'password',
         ];
         $url = $I->grabFixture('users')->wrapUrl('/post/v1frontend/post/view', 'fe');
         $I->sendGET($url, $data);
-        $I->seeResponseContains('title');
-    }
-
-    /**
-     * @group postFeCreateWelfare
-     */
-    public function tryCreateWelfare(ApiTester $I)
-    {
-        $data = [
-            'excerpt' => 'https://m.facebook.com/story.php?story_fbid=5425215360831539&id=100000293855187',
-        ];
-        $url = $I->grabFixture('users')->wrapUrl('/post/v1frontend/post/create-welfare', 'fe');
-        $I->sendPOST($url, $data);
-        $I->seeResponseContains('SUCCESS');
+        $I->seeResponseContainsJson(['poid' => $this->poid]);
     }
 }

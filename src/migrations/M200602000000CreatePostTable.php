@@ -33,7 +33,7 @@ CREATE TABLE {{%post}} (
     `fileSize`      bigint          default 0  not null,
     `imageWidth`    int             default 0  not null,
     `imageHeight`   int             default 0  not null,
-    `commentStatus` tinyint         default 0  not null,
+    `commentOpen`   tinyint         default 0  not null,
     `commentCount`  int             default 0  not null,
     `objTable`      varchar(64)     default '' not null,
     `objid`         varchar(64)     default '' not null,
